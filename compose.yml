@@ -1,0 +1,65 @@
+services:
+    db:
+        image: postgres:16-alpine
+        container_name: waypoint-db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: waypoint
+            POSTGRES_PASSWORD: 1q2w3e4r5t6y
+            POSTGRES_DB: waypoint_db
+            PGDATA: /var/lib/postgresql/waypoint_data/pg_data
+        expose:
+            - 5432
+        volumes:
+            - postgres_waypoint_data:/var/lib/postgresql/waypoint_data
+            - ./src/infrastructure/dbs/postgres/init:/docker-entrypoint-initdb.d
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U waypoint -d waypoint_db"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        networks:
+            - waypoint-network
+
+    gateway:
+        build:
+            context: .
+            dockerfile: docker/dev.Dockerfile
+        container_name: waypoint-ahandler
+        restart: unless-stopped
+        env_file: ./.env
+        ports:
+            - "9654:8000"
+        depends_on:
+            db:
+                condition: service_healthy
+        command: >
+            sh -c "python -m uvicorn src.entrypoint:app --host 0.0.0.0 --port 8000 --reload"
+        volumes:
+            - ./:/app
+        environment:
+            - DATABASE_URL=postgresql+asyncpg://waypoint:1q2w3e4r5t6y@db:5432/waypoint_db
+        networks:
+            - waypoint-network
+        healthcheck:
+            test:
+                [
+                    "CMD",
+                    "python",
+                    "-c",
+                    "import urllib.request; r=urllib.request.urlopen('http://localhost:8000/health', timeout=5); exit(0 if r.status==200 else 1)",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+
+volumes:
+    postgres_waypoint_data:
+        driver: local
+
+networks:
+    waypoint-network:
+        name: waypoint-network
+        driver: bridge
