@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Dict
 from uuid import UUID
 
-from pydantic.dataclasses import dataclass, field
+from pydantic.dataclasses import dataclass, Field
 
 from src.domain.shared.types import EVENT_STATUSES
 
@@ -20,4 +20,4 @@ class EventModel:
     cached: bool = False
     error: Dict[str, Any] | None = None
     duration_ms: int | None = None
-    created_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.now)
