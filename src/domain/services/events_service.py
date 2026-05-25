@@ -55,15 +55,19 @@ class EventService:
     async def list_events(
         self,
         execution_id: UUID,
-        checkpoint_step_number: int,
+        up_to_step: int | None = None,
         offset: int = 0,
         limit: int = 100,
     ) -> list[EventModel]:
+        filters = []
+        if up_to_step is not None:
+            filters = [
+                EventModel.step_number <= up_to_step,
+            ]
+
         events = await self.event_dao.query(
             execution_id=execution_id,
-            filters=[
-                EventModel.step_number == checkpoint_step_number,
-            ],
+            filters=filters,
             offset=offset,
             limit=limit,
         )
