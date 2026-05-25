@@ -43,7 +43,7 @@ class ReplayEngine:
         # Load events up to last checkpoint
         events = await self.events_service.list_events(
             execution_id=execution_id,
-            checkpoint_step_number=checkpoint.step_number,
+            up_to_step=checkpoint.step_number,
             offset=offset,
             limit=limit,
         )
@@ -74,7 +74,7 @@ class ReplayEngine:
 
         events = await self.events_service.list_events(
             execution_id=execution_id,
-            checkpoint_step_number=step_number,
+            up_to_step=step_number,
             offset=offset,
             limit=limit,
         )
