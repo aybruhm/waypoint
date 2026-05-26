@@ -18,8 +18,8 @@ class EventService:
         create_data: EventCreateData,
     ) -> EventModel:
         return EventModel(
-            id=uuid7(),  # type: ignore[assignment]
-            execution_id=execution_id,
+            id=UUID(str(uuid7())),
+            execution_id=UUID(str(execution_id)),
             step_number=step_number,
             step_name=create_data.step_name,
             input=create_data.input_data,
@@ -32,7 +32,7 @@ class EventService:
         )
 
     def reconstruct_state(self, events: list[EventModel]) -> ConstructedState:
-        state: ConstructedState = {}  # type: ignore[assignment]
+        state: ConstructedState = {}
         for event in events:
             if event.status == "completed" and event.output:
                 state[event.step_name] = event.output
@@ -59,15 +59,9 @@ class EventService:
         offset: int = 0,
         limit: int = 100,
     ) -> list[EventModel]:
-        filters = []
-        if up_to_step is not None:
-            filters = [
-                EventModel.step_number <= up_to_step,
-            ]
-
         events = await self.event_dao.query(
             execution_id=execution_id,
-            filters=filters,
+            up_to_step=up_to_step,
             offset=offset,
             limit=limit,
         )

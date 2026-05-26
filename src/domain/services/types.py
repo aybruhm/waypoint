@@ -1,14 +1,13 @@
-from typing import Any, Dict, TypedDict
+from typing import Any, Dict
 from uuid import UUID
 
-from pydantic.dataclasses import dataclass, Field
+from pydantic.fields import Field
+from pydantic.dataclasses import dataclass
 
 # ---- Events types
 
 
-class ConstructedState(TypedDict):
-    step_name: str
-    output: Dict[str, Any]
+ConstructedState = Dict[str, Any]
 
 
 @dataclass(frozen=True)

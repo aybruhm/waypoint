@@ -32,8 +32,8 @@ class CheckpointService:
         state_hash: str,
     ) -> CheckpointModel:
         return CheckpointModel(
-            id=uuid7(),  # type: ignore[assignment]
-            execution_id=execution_id,
+            id=UUID(str(uuid7())),
+            execution_id=UUID(str(execution_id)),
             step_number=step_number,
             completed_at=datetime.now(),
             state_hash=state_hash,
