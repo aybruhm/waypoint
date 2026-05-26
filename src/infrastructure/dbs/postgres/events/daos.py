@@ -1,7 +1,6 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.sql.elements import ColumnElement
 
 from src.domain.ports.events.interfaces import EventDAOInterface, EventModel
 from src.infrastructure.dbs.postgres.engine import get_db_session
@@ -11,13 +10,13 @@ from src.infrastructure.dbs.postgres.events.dbes import EventDBE
 class EventDAO(EventDAOInterface):
     def _map_dbe_to_model(self, dbe: EventDBE) -> EventModel:
         return EventModel(
-            id=dbe.id,  # type: ignore
-            execution_id=dbe.execution_id,  # type: ignore
+            id=UUID(str(dbe.id)),
+            execution_id=UUID(str(dbe.execution_id)),
             step_number=dbe.step_number,  # type: ignore
             step_name=dbe.step_name,  # type: ignore
             input=dbe.input,  # type: ignore
             output=dbe.output,  # type: ignore
-            status=dbe.output,  # type: ignore
+            status=dbe.status,  # type: ignore
             side_effects=dbe.side_effects,  # type: ignore
             cached=dbe.cached,  # type: ignore
             error=dbe.error,  # type: ignore
@@ -49,9 +48,9 @@ class EventDAO(EventDAOInterface):
     async def query(
         self,
         execution_id: UUID,
-        filters: list[ColumnElement],
         offset: int,
         limit: int,
+        up_to_step: int | None = None,
     ) -> list[EventModel]:
         async with get_db_session() as session:
             stmt = (
@@ -59,8 +58,8 @@ class EventDAO(EventDAOInterface):
                 .where(EventDBE.execution_id == execution_id)
                 .order_by(EventDBE.step_number.asc())
             )
-            if filters is not None:
-                stmt = stmt.filter(*filters)
+            if up_to_step is not None:
+                stmt = stmt.where(EventDBE.step_number <= up_to_step)
 
             result = await session.execute(stmt)
             events_dbes = result.scalars().all()
