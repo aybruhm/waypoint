@@ -9,6 +9,7 @@ dependencies = [
     "alembic>=1.18.4",
     "asyncpg>=0.31.0",
     "fastapi>=0.136.3",
+    "httpx>=0.28.0",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
     "pytest>=9.0.3",
@@ -17,3 +18,18 @@ dependencies = [
     "uuid-utils>=0.16.0",
     "uvicorn>=0.48.0",
 ]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["sdk*"]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=0.21.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
