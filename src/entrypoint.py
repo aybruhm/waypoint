@@ -6,10 +6,12 @@ from src.application.checkpoints_router import CheckpointAPIRouter
 from src.application.executions_router import ExecutionAPIRouter
 from src.domain.services.checkpoints_service import CheckpointService
 from src.domain.services.events_service import EventService
+from src.domain.services.executions_service import ExecutionService
 from src.domain.services.replay_engine import ReplayEngine
 from src.infrastructure.dbs.postgres.checkpoints.daos import CheckpointDAO
 from src.infrastructure.dbs.postgres.engine import check_connection, cleanup_connections
 from src.infrastructure.dbs.postgres.events.daos import EventDAO
+from src.infrastructure.dbs.postgres.executions.daos import ExecutionDAO
 
 
 @asynccontextmanager
@@ -43,10 +45,12 @@ async def check_server_health():
 # Initialize DAOs
 events_dao = EventDAO()
 checkpoints_dao = CheckpointDAO()
+executions_dao = ExecutionDAO()
 
 # Initialize services
 events_service = EventService(event_dao=events_dao)
 checkpoints_service = CheckpointService(checkpoint_dao=checkpoints_dao)
+executions_service = ExecutionService(execution_dao=executions_dao)
 replay_engine = ReplayEngine(
     events_service=events_service,
     checkpoints_service=checkpoints_service,
@@ -56,6 +60,7 @@ replay_engine = ReplayEngine(
 execution_router = ExecutionAPIRouter(
     replay_engine=replay_engine,
     events_service=events_service,
+    executions_service=executions_service,
 )
 checkpoint_router = CheckpointAPIRouter(
     checkpoints_service=checkpoints_service,

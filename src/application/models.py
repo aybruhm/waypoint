@@ -5,6 +5,20 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class CreateExecutionRequest(BaseModel):
+    agent_id: str
+    initial_input: Dict[str, Any] | None = None
+
+
+class CreateExecutionResponse(BaseModel):
+    id: UUID
+    agent_id: str
+    status: str
+    started_at: datetime
+    initial_input: Dict[str, Any] | None = None
+    created_at: datetime
+
+
 class ReplayFromStepRequest(BaseModel):
     step_number: int
 
@@ -33,7 +47,14 @@ class ExecutionHistoryResponse(BaseModel):
 class CreateCheckpointRequest(BaseModel):
     execution_id: UUID
     step_number: int
+    step_name: str
     state: Dict[str, Any]
+    input_data: Dict[str, Any] = Field(default_factory=dict)
+    output_data: Dict[str, Any] | None = None
+    status: str = "completed"
+    duration_ms: int | None = None
+    error: Dict[str, Any] | None = None
+    cached: bool = False
 
 
 class LoadStateFromCheckpointRequest(BaseModel):
