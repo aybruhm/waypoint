@@ -2,6 +2,57 @@
 
 **Waypoint** is a lightweight Python SDK for building fault-tolerant LLM agent workflows. It enables agent systems to recover from crashes by replaying execution from checkpoints, without re-invoking deterministic operations like LLM calls or completed tool invocations.
 
+## Getting Started
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/engine/install/) + [Docker Compose](https://docs.docker.com/compose/install/)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python 3.13+)
+
+### Clone & Start
+
+```sh
+git clone git@github.com:aybruhm/waypoint.git
+cd waypoint
+make up
+```
+
+This builds and starts the API gateway (`waypoint-ahandler`) on `http://localhost:9654` and a PostgreSQL instance (`waypoint-db`). The gateway auto-reloads on source changes.
+
+### Run Migrations
+
+```sh
+make run_migrations
+```
+
+### Run the Examples
+
+```sh
+# Simple 3-step agent without LLM
+uv run python -m sdk.examples.simple_agent
+
+# Agent with mocked LLM + crash recovery demo
+uv run python -m sdk.examples.agent_with_llm_mock
+```
+
+### Stop
+
+```sh
+make down
+```
+
+### Makefile Reference
+
+| Command | Description |
+|---------|-------------|
+| `make up` / `make start` | Build & start containers (detached) |
+| `make down` / `make stop` | Stop & remove containers |
+| `make run_migrations` | Apply pending Alembic migrations |
+| `make revert_migrations` | Roll back the last migration |
+| `make add_migration MSG="msg"` | Auto-generate a new migration |
+| `make show_current_db_head` | Show current migration version |
+| `make show_db_heads` | List all migration heads |
+
 ### Problem It Solves
 
 When an LLM-driven agent workflow crashes mid-execution:
@@ -75,8 +126,3 @@ PostgreSQL (events, checkpoints, metadata)
 - **Backend engineers** building LLM agent APIs with FastAPI.
 - **ML platform teams** running user-submitted agents or multi-step workflows.
 - **AI startups** optimizing LLM token usage and reliability.
-
-### License
-
-[BSD 2-Clause](./LICENSE)
-
