@@ -34,7 +34,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("started_at", sa.DateTime(), nullable=True),
-        sa.Column("completed_at", sa.DateTime(), nullable=False),
+        sa.Column("completed_at", sa.DateTime(), nullable=True),
         sa.Column(
             "initial_input", postgresql.JSONB(astext_type=sa.Text()), nullable=False
         ),
@@ -163,4 +163,6 @@ def downgrade() -> None:
     op.drop_index("idx_execution_created_at", table_name="executions")
     op.drop_index("idx_execution_agent_id", table_name="executions")
     op.drop_table("executions")
+    op.execute("DROP TYPE IF EXISTS event_execution_status_enum_type")
+    op.execute("DROP TYPE IF EXISTS execution_status_enum_types")
     # ### end Alembic commands ###

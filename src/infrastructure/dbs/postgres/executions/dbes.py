@@ -25,7 +25,7 @@ class ExecutionDBE(DBEBase):
     started_at = Column(DateTime(), default=datetime.now)
     completed_at = Column(
         DateTime(),
-        nullable=False,
+        nullable=True,
     )
     initial_input = Column(
         mutable_json_type(dbtype=JSONB, nested=True),
