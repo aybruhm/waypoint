@@ -13,8 +13,8 @@ from src.infrastructure.dbs.postgres.engine import get_db_session
 class CheckpointDAO(CheckpointDAOInterface):
     def _map_dbe_to_model(self, dbe: CheckpointDBE) -> CheckpointModel:
         return CheckpointModel(
-            id=dbe.id,  # type: ignore
-            execution_id=dbe.agent_id,  # type: ignore
+            id=str(dbe.id),  # type: ignore
+            execution_id=str(dbe.execution_id),  # type: ignore
             step_number=dbe.step_number,  # type: ignore
             completed_at=dbe.completed_at,  # type: ignore
             state_hash=dbe.state_hash,  # type: ignore
@@ -53,13 +53,11 @@ class CheckpointDAO(CheckpointDAOInterface):
 
     async def get_last(self, execution_id: UUID) -> CheckpointModel | None:
         async with get_db_session() as session:
-            stmt = (
-                select(CheckpointDBE)
-                .where(CheckpointDBE.execution_id == execution_id)
-                .order_by(CheckpointDBE.step_number.desc())
+            stmt = select(CheckpointDBE).where(
+                CheckpointDBE.execution_id == execution_id
             )
             result = await session.execute(stmt)
-            checkpoint_dbe = result.scalars().first()
+            checkpoint_dbe = result.scalar_one_or_none()
             if not checkpoint_dbe:
                 return None
 

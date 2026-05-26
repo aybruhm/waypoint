@@ -11,7 +11,7 @@ from src.infrastructure.dbs.postgres.executions.dbes import ExecutionDBE
 class ExecutionDAO(ExecutionDAOInterface):
     def _map_dbe_to_model(self, dbe: ExecutionDBE) -> ExecutionModel:
         return ExecutionModel(
-            id=dbe.id,  # type: ignore
+            id=UUID(str(dbe.id)),
             agent_id=dbe.agent_id,  # type: ignore
             status=dbe.status,  # type: ignore
             started_at=dbe.started_at,  # type: ignore
@@ -30,6 +30,7 @@ class ExecutionDAO(ExecutionDAOInterface):
             execution_dbe = ExecutionDBE(
                 agent_id=agent_id,
                 initial_input=initial_input,
+                status="running",
             )
 
             session.add(execution_dbe)
