@@ -1,13 +1,15 @@
-# [PoC] Waypoint: Agent Execution Recovery via Event Sourcing
+# Waypoint
 
-**Waypoint** is a lightweight Python SDK for building fault-tolerant LLM agent workflows. It enables agent systems to recover from crashes by replaying execution from checkpoints, without re-invoking deterministic operations like LLM calls or completed tool invocations.
+A Python SDK for making LLM agent workflows fault-tolerant via event sourcing.
+
+When an agent crashes mid-execution, Waypoint lets you resume from the last successful step—without re-running LLM calls or tool invocations that already completed. It does this by logging every step's input/output to an append-only PostgreSQL journal, then replaying from checkpoints on recovery.
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/engine/install/) + [Docker Compose](https://docs.docker.com/compose/install/)
-- [uv](https://docs.astral.sh/uv/getting-started/installation/) (Python 3.13+)
+- Docker + Docker Compose
+- [uv](https://docs.astral.sh/uv/) (Python 3.13+)
 
 ### Clone & Start
 
@@ -17,7 +19,7 @@ cd waypoint
 make up
 ```
 
-This builds and starts the API gateway (`waypoint-ahandler`) on `http://localhost:9654` and a PostgreSQL instance (`waypoint-db`). The gateway auto-reloads on source changes.
+This starts the API gateway on `http://localhost:9654` and PostgreSQL. The gateway auto-reloads on code changes.
 
 ### Run Migrations
 
@@ -25,13 +27,13 @@ This builds and starts the API gateway (`waypoint-ahandler`) on `http://localhos
 make run_migrations
 ```
 
-### Run the Examples
+### Run Examples
 
 ```sh
-# Simple 3-step agent without LLM
+# 3-step agent, no LLM
 uv run python -m sdk.examples.simple_agent
 
-# Agent with mocked LLM + crash recovery demo
+# Mocked LLM + crash recovery demo
 uv run python -m sdk.examples.agent_with_llm_mock
 ```
 
@@ -48,81 +50,102 @@ make down
 | `make up` / `make start` | Build & start containers (detached) |
 | `make down` / `make stop` | Stop & remove containers |
 | `make run_migrations` | Apply pending Alembic migrations |
-| `make revert_migrations` | Roll back the last migration |
-| `make add_migration MSG="msg"` | Auto-generate a new migration |
+| `make revert_migrations` | Roll back last migration |
+| `make add_migration MSG="msg"` | Auto-generate new migration |
 | `make show_current_db_head` | Show current migration version |
 | `make show_db_heads` | List all migration heads |
 
-### Problem It Solves
+---
 
-When an LLM-driven agent workflow crashes mid-execution:
+## What It Solves
 
-1. **Cost waste** – Prior LLM calls have consumed tokens but produced no usable output. Naive retry logic re-calls the LLM, wasting money.
-2. **Opaque state loss** – No execution history means manual debugging. What step failed? What was the intermediate state?
-3. **Duplicate side effects** – Retrying a tool invocation (e.g., API write) may create duplicates or violate idempotency constraints.
+LLM agent crashes create three problems:
 
-Waypoint solves this with an immutable event journal that logs every step's input/output. On crash, the system reads the checkpoint, reconstructs the agent state from cached outputs, and resumes deterministically from the next step—no re-execution, no duplicate costs.
+1. **Wasted spend**: LLM calls that succeeded before the crash get re-invoked on retry.
+2. **Lost context**: No record of what happened, what state the agent was in, or which step failed.
+3. **Duplicate effects**: Retrying a tool call (e.g., an API write) can create duplicates or break idempotency.
 
-### Key Features
+Waypoint avoids all three by persisting every step's result. On crash, you resume from the checkpoint—cached LLM responses return instantly, tool outputs are reused, and execution continues from the next step.
 
-- **Event-sourced execution** – Every step is logged to an append-only journal in PostgreSQL.
-- **Deterministic replay** – State is reconstructed from cached events without re-executing prior steps.
-- **LLM response caching** – LLM outputs are cached; replay returns cached responses instantly (zero re-call cost).
-- **Minimal SDK footprint** – Drop-in decorator (`@checkpoint`) requires <5 LOC changes to agent code.
-- **Framework-agnostic** – Works with LangChain, CrewAI, custom async agents, FastAPI, etc.
-- **Complete execution history** – Query the full timeline of steps, errors, and state transitions for debugging.
-- **Checkpoint-based recovery** – Resume from the last successful step with one API call.
+---
 
-### Use Cases
-
-1. **Long-running agent workflows** – Agents that orchestrate multiple LLM calls and tool invocations over minutes/hours. Crashes are costly; recovery is essential.
-2. **Cost-sensitive applications** – Minimize wasted LLM tokens on retries. Cache responses, replay instantly.
-3. **Observability & debugging** – Full execution history helps teams understand agent behavior, failure modes, and bottlenecks.
-4. **Agent-as-a-service** – SaaS platforms running user-submitted agents need reliable, auditable execution.
-
-### Positioning vs Alternatives
-
-| Tool | Scope | Best For | Trade-off |
-|------|-------|----------|-----------|
-| **Waypoint** | Single-machine, event-sourced recovery | Agent workflows, cost optimization | Single-process, limited scale |
-| **Temporal** | Distributed, general workflow orchestration | Microservices, complex routing | Overkill for agents, learning curve |
-| **Celery + Redis** | Distributed task queue | Background jobs, work distribution | No agent semantics, manual caching |
-| **LangChain Memory** | In-memory state mgmt | Conversation history | Volatile, no crash recovery |
-
-**Waypoint's differentiator:** Agent-first design. Checkpoints are cheap, replay is deterministic, LLM calls are cached, and the API is dead simple.
-
-### Technical Stack
-
-- **Language:** Python 3.10+
-- **Async runtime:** asyncio
-- **Framework:** FastAPI (for demo), but framework-agnostic
-- **Database:** PostgreSQL (append-only event log, checkpoint tracking)
-- **Serialization:** Pydantic, JSON
-
-### Architecture
+## Architecture
 
 ```
 Agent Code
     ↓
 @checkpoint decorators (Waypoint SDK)
     ↓
-┌─────────────────┬──────────────────┬────────────────┐
-│ Event Journal   │ Checkpoint Mgr   │ Replay Engine  │
-│ (append-only)   │ (track progress) │ (deterministic)│
-└─────────────────┴──────────────────┴────────────────┘
+┌────────────────┬─────────────────┬──────────────────┐
+│ Event Journal  │ Checkpoint Mgr  │ Replay Engine    │
+│ (append-only)  │ (progress)      │ (deterministic)  │
+└────────────────┴─────────────────┴──────────────────┘
     ↓
-PostgreSQL (events, checkpoints, metadata)
+PostgreSQL
 ```
 
-### Success Metrics
+---
 
-- Agent crashes on step 5 of 10; resumes from step 5 without re-executing steps 1–4.
-- Checkpoint write latency < 50ms.
-- Full execution history queryable for any execution ID.
-- Zero code changes to agent logic (besides adding `@checkpoint` decorators).
+## Core Concepts
 
-### Target Audience
+| Concept | Description |
+|---------|-------------|
+| **Execution** | A single run of an agent workflow, identified by a UUID. |
+| **Step** | A decorated async function (`@checkpoint("name")`). Each step runs once per execution. |
+| **Checkpoint** | A persisted record of a step's input/output + execution position. |
+| **Event Journal** | Append-only log of all steps across all executions (PostgreSQL). |
+| **Replay** | Reconstructing state by reading checkpoints in order, skipping re-execution. |
 
-- **Backend engineers** building LLM agent APIs with FastAPI.
-- **ML platform teams** running user-submitted agents or multi-step workflows.
-- **AI startups** optimizing LLM token usage and reliability.
+---
+
+## How It Works
+
+```
+@checkpoint("step_name")
+async def my_step(input):
+    return output
+```
+
+The decorator:
+1. Checks if a checkpoint exists for this step in the current execution.
+2. If yes: returns cached output immediately (no function execution).
+3. If no: runs the function, persists input/output as a checkpoint, returns output.
+
+On crash, create a new `Waypoint` instance and call `resume(execution_id)`. The SDK rebuilds state from the journal and continues from the next uncompleted step.
+
+---
+
+## Key Properties
+
+- **Deterministic replay** — Same inputs always produce same outputs; no re-execution.
+- **LLM call caching** — Cached responses are returned on replay (zero token cost).
+- **Framework-agnostic** — Works with LangChain, CrewAI, custom async agents, FastAPI, etc.
+- **Minimal integration** — Add `@checkpoint` decorators (one per step). ~3 lines of change per step.
+- **Full history** — Query every step, error, and state transition by execution ID.
+
+---
+
+## When to Use
+
+- Long-running agent workflows (minutes to hours) where crashes are expensive.
+- Cost-sensitive apps where re-calling LLMs on retry is unacceptable.
+- Teams needing audit trails for agent behavior and debugging.
+- Agent-as-a-service platforms running untrusted/user-submitted agents.
+
+---
+
+## When Not to Use (Next Steps)
+
+- Distributed/multi-machine workflows (Waypoint is single-process).
+- High-throughput task queues (use Celery, Temporal, etc.).
+- Simple chatbots with no multi-step orchestration.
+
+---
+
+## Stack
+
+- Python 3.13+
+- asyncio
+- FastAPI (gateway demo only; SDK is framework-agnostic)
+- PostgreSQL (events + checkpoints)
+- Pydantic + JSON serialization
