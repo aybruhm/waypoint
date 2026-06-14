@@ -1,0 +1,95 @@
+name: Release Python SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 0.2.0)"
+        required: true
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version format
+        run: |
+          echo "${{ github.event.inputs.version }}" \
+            | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || (echo "Invalid version format — expected MAJOR.MINOR.PATCH" && exit 1)
+
+      - name: Bump version in pyproject.toml
+        run: |
+          sed -i 's/^version = ".*"/version = "${{ github.event.inputs.version }}"/' \
+            pyproject.toml
+
+      - name: Commit and tag
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
+          git add pyproject.toml
+          if git diff --cached --quiet; then
+            echo "Version already at ${{ github.event.inputs.version }} — skipping commit"
+          else
+            git commit -m "chore: bump waypoint to v${{ github.event.inputs.version }}"
+          fi
+          git tag "v${{ github.event.inputs.version }}"
+          if [ "${ACT}" = "true" ]; then
+            echo "Skipping push — running locally in act"
+          else
+            git push origin HEAD "v${{ github.event.inputs.version }}"
+          fi
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [tag]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ACT != 'true' && format('v{0}', github.event.inputs.version) || github.ref }}
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Build
+        run: uv build
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: "latest"
+
+      - name: Publish to PyPI
+        env:
+          UV_PUBLISH_TOKEN: ${{ env.ACT == 'true' && secrets.TEST_PYPI_TOKEN || secrets.PYPI_TOKEN }}
+        run: |
+          if [ "${ACT}" = "true" ]; then
+            uv publish --publish-url https://test.pypi.org/legacy/ 'dist/*'
+          else
+            uv publish 'dist/*'
+          fi
