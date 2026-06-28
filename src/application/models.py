@@ -33,6 +33,13 @@ class ExecutionStep(BaseModel):
     timestamp: str
 
 
+class ExecutionStatusResponse(BaseModel):
+    execution_id: UUID
+    status: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
 class ExecutionHistoryResponse(BaseModel):
     execution_id: UUID
     agent_id: str
