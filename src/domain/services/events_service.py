@@ -4,12 +4,18 @@ from uuid_utils import uuid7
 
 from src.domain.entities.events.models import EventModel
 from src.domain.ports.events.interfaces import EventDAOInterface
+from src.domain.services.batch_event_writer import BatchEventWriter
 from src.domain.services.types import ConstructedState, EventCreateData
 
 
 class EventService:
-    def __init__(self, event_dao: EventDAOInterface):
+    def __init__(
+        self,
+        event_dao: EventDAOInterface,
+        batch_writer: BatchEventWriter | None = None,
+    ):
         self.event_dao = event_dao
+        self._batch_writer = batch_writer
 
     def _map_create_data_to_model(
         self,
@@ -44,13 +50,18 @@ class EventService:
         step_number: int,
         event_data: EventCreateData,
     ) -> EventModel:
-        _event = self._map_create_data_to_model(
+        event = self._map_create_data_to_model(
             execution_id=execution_id,
             step_number=step_number,
             create_data=event_data,
         )
-        event = await self.event_dao.create(event=_event)
-        return event
+        if self._batch_writer:
+            # Non-blocking: event is queued in memory, and flushed in background.
+            await self._batch_writer.add_event(event=event)
+            return event  # optimistic return; persistence is async
+
+        # Fallback: direct single-rwo write (backward-compatible behaviour)
+        return await self.event_dao.create(event=event)
 
     async def list_events(
         self,
