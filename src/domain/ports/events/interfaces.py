@@ -18,3 +18,7 @@ class EventDAOInterface(ABC):
         up_to_step: int | None = None,
     ) -> list[EventModel]:
         raise NotImplementedError
+
+    @abstractmethod
+    async def insert_batch(self, events: list[EventModel]) -> None:
+        raise NotImplementedError

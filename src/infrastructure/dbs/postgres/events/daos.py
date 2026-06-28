@@ -45,6 +45,27 @@ class EventDAO(EventDAOInterface):
             event_model = self._map_dbe_to_model(dbe=event_dbe)
             return event_model
 
+    async def insert_batch(self, events: list[EventModel]) -> None:
+        async with get_db_session() as session:
+            dbes = [
+                EventDBE(
+                    execution_id=event.execution_id,
+                    step_number=event.step_number,
+                    step_name=event.step_name,
+                    input=event.input,
+                    output=event.output,
+                    side_effects=event.side_effects,
+                    cached=event.cached,
+                    status=event.status,
+                    error=event.error,
+                    duration_ms=event.duration_ms,
+                )
+                for event in events
+            ]
+
+            session.add_all(dbes)
+            await session.commit()
+
     async def query(
         self,
         execution_id: UUID,
