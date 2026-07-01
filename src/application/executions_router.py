@@ -18,7 +18,6 @@ from src.domain.services.events_service import EventService
 from src.domain.services.executions_service import ExecutionService
 from src.domain.services.replay_engine import ReplayEngine
 from src.infrastructure.workers.celery_app import celery_app
-from src.infrastructure.workers.tasks.executions import run_execution
 
 
 class ExecutionAPIRouter:
@@ -135,14 +134,9 @@ class ExecutionAPIRouter:
                 agent_id=body.agent_id,
                 initial_input=initial_input,
             )
-            run_execution.delay(  # type: ignore
-                execution_id=str(execution.id),
-                agent_id=body.agent_id,
-                initial_input=initial_input,
-            )
             return ExecutionStatusResponse(
                 execution_id=execution.id,
-                status="queued",
+                status=execution.status,
             )
         except Exception as e:
             traceback.print_exc()
