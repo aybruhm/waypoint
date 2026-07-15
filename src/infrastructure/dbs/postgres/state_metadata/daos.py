@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.state_metadata.models import StateMetadataModel
 from src.infrastructure.dbs.postgres.engine import get_db_session
@@ -18,18 +19,55 @@ class StateMetadataDAO:
             created_at=dbe.created_at,  # type: ignore
         )
 
+    async def _create(
+        self,
+        session: AsyncSession,
+        model: StateMetadataModel,
+    ) -> StateMetadataDBE:
+        state_metadata_dbe = StateMetadataDBE(
+            execution_id=model.execution_id,
+            compression_algorithm=model.compression_algorithm,
+            original_size_bytes=model.original_size_bytes,
+            compressed_size_bytes=model.compressed_size_bytes,
+            schema_version=model.schema_version,
+        )
+        session.add(state_metadata_dbe)
+        await session.flush()
+        return state_metadata_dbe
+
+    async def _update(
+        self,
+        session: AsyncSession,
+        model: StateMetadataModel,
+        existing_dbe: StateMetadataDBE,
+    ) -> StateMetadataDBE | None:
+        existing_dbe.compression_algorithm = model.compression_algorithm  # type: ignore
+        existing_dbe.original_size_bytes = model.original_size_bytes  # type: ignore
+        existing_dbe.compressed_size_bytes = model.compressed_size_bytes  # type: ignore
+        existing_dbe.schema_version = model.schema_version  # type: ignore
+        await session.flush()
+        return existing_dbe
+
     async def upsert(self, model: StateMetadataModel) -> StateMetadataModel:
         async with get_db_session() as session:
-            dbe = StateMetadataDBE(
-                execution_id=model.execution_id,
-                compression_algorithm=model.compression_algorithm,
-                original_size_bytes=model.original_size_bytes,
-                compressed_size_bytes=model.compressed_size_bytes,
-                schema_version=model.schema_version,
+            stmt = select(StateMetadataDBE).where(
+                StateMetadataDBE.execution_id == model.execution_id
             )
-            session.add(dbe)
-            await session.commit()
-            state_metadata_model = self._map_dbe_to_model(dbe)
+            result = await session.execute(stmt)
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                state_metadata_dbe = self._update(
+                    session=session, model=model, existing_dbe=existing
+                )
+            else:
+                state_metadata_dbe = self._create(
+                    session=session,
+                    model=model,
+                )
+
+            state_metadata_dbe = result.scalar_one()
+            state_metadata_model = self._map_dbe_to_model(state_metadata_dbe)
             return state_metadata_model
 
     async def get(self, execution_id: UUID) -> StateMetadataModel | None:
