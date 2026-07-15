@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import UUID, Column, DateTime, ForeignKey, Integer, String
+from uuid_utils import uuid7
 
 from src.infrastructure.dbs.postgres.base import DBEBase
 
@@ -8,6 +9,7 @@ from src.infrastructure.dbs.postgres.base import DBEBase
 class StateMetadataDBE(DBEBase):
     __tablename__ = "state_metadata"
 
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
     execution_id = Column(
         UUID(as_uuid=True),
         ForeignKey("executions.id", ondelete="CASCADE"),
