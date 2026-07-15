@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 import src.infrastructure.dbs.postgres.checkpoints.dbes  # noqa: F401
 import src.infrastructure.dbs.postgres.events.dbes  # noqa: F401
 import src.infrastructure.dbs.postgres.executions.dbes  # noqa: F401
+import src.infrastructure.dbs.postgres.state_metadata.dbes  # noqa: F401
 from src.infrastructure.config import settings
 from src.infrastructure.dbs.postgres.base import DBEBase
 
