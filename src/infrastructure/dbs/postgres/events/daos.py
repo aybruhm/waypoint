@@ -3,26 +3,29 @@ from uuid import UUID
 from sqlalchemy import select
 
 from src.domain.ports.events.interfaces import EventDAOInterface, EventModel
+from src.domain.services.events_schema_registry import EventSchemaRegistry
 from src.infrastructure.dbs.postgres.engine import get_db_session
 from src.infrastructure.dbs.postgres.events.dbes import EventDBE
 
 
 class EventDAO(EventDAOInterface):
     def _map_dbe_to_model(self, dbe: EventDBE) -> EventModel:
-        return EventModel(
-            id=UUID(str(dbe.id)),
-            execution_id=UUID(str(dbe.execution_id)),
-            step_number=dbe.step_number,  # type: ignore
-            step_name=dbe.step_name,  # type: ignore
-            input=dbe.input,  # type: ignore
-            output=dbe.output,  # type: ignore
-            status=dbe.status,  # type: ignore
-            side_effects=dbe.side_effects,  # type: ignore
-            cached=dbe.cached,  # type: ignore
-            error=dbe.error,  # type: ignore
-            duration_ms=dbe.duration_ms,  # type: ignore
-            created_at=dbe.created_at,  # type: ignore
-        )
+        raw = {
+            "id": dbe.id,
+            "execution_id": dbe.execution_id,
+            "step_number": dbe.step_number,
+            "step_name": dbe.step_name,
+            "input": dbe.input,
+            "output": dbe.output,
+            "status": dbe.status,
+            "side_effects": dbe.side_effects,
+            "cached": dbe.cached,
+            "error": dbe.error,
+            "duration_ms": dbe.duration_ms,
+            "schema_version": getattr(dbe, "schema_version", None) or 1,
+            "created_at": dbe.created_at.isoformat(),
+        }
+        return EventSchemaRegistry.deserialize(raw=raw)
 
     async def create(self, event: EventModel) -> EventModel:
         async with get_db_session() as session:
