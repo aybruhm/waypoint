@@ -15,6 +15,17 @@ class ExecutionDBE(DBEBase):
         Index("idx_execution_agent_id", "agent_id"),
         Index("idx_execution_status", "status"),
         Index("idx_execution_created_at", "created_at"),
+        Index("idx_execution_deleted_at", "deleted_at"),
+        # -------------------------------------------------------------------
+        # Learn more about composite and covering index with Postgres here:
+        # ---- https://www.opcito.com/blogs/a-guide-to-postgresql-indexing-with-sqlalchemy
+        # -------------------------------------------------------------------
+        Index(
+            "idx_execution_status_created",
+            "status",
+            "created_at",
+            postgresql_ops={"created_at": "DESC"},
+        ),
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
@@ -27,6 +38,11 @@ class ExecutionDBE(DBEBase):
         DateTime(),
         nullable=True,
     )
+    execution_mode = Column(
+        String(50),
+        nullable=False,
+        default="standard",
+    )
     initial_input = Column(
         mutable_json_type(dbtype=JSONB, nested=True),
         nullable=False,
@@ -34,3 +50,4 @@ class ExecutionDBE(DBEBase):
     )
     created_at = Column(DateTime(), default=datetime.now)
     updated_at = Column(DateTime(), default=datetime.now)
+    deleted_at = Column(DateTime(), default=datetime.now)
