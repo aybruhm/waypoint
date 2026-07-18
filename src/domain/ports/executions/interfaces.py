@@ -21,3 +21,7 @@ class ExecutionDAOInterface(ABC):
     @abstractmethod
     async def update_status(self, id: UUID, status: str) -> ExecutionModel | None:
         raise NotImplementedError
+
+    @abstractmethod
+    async def soft_delete(self, execution_id: UUID) -> None:
+        raise NotImplementedError
