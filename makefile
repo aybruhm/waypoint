@@ -1,4 +1,4 @@
-container_name = waypoint-ahandler
+container_name = waypoint-gateway
 compose_file = compose.yml
 
 .PHONY: up down start stop test_ci_workflow add_migration run_migrations revert_migrations show_current_db_head show_db_heads

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict
 from uuid import UUID
 
@@ -66,3 +67,13 @@ class ExecutionDAO(ExecutionDAOInterface):
 
             execution_model = self._map_dbe_to_model(dbe=execution_dbe)
             return execution_model
+
+    async def soft_delete(self, execution_id: UUID) -> None:
+        async with get_db_session() as session:
+            stmt = (
+                update(ExecutionDBE)
+                .where(ExecutionDBE.id == execution_id)
+                .values(deleted_at=datetime.now())
+            )
+            await session.execute(stmt)
+            await session.commit()

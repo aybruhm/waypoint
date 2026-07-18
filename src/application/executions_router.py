@@ -16,6 +16,7 @@ from src.application.models import (
 from src.domain.exceptions import CheckpointNotFoundError
 from src.domain.services.events_service import EventService
 from src.domain.services.executions_service import ExecutionService
+from src.domain.services.gdpr_deletion_service import GDPRDeletionService
 from src.domain.services.replay_engine import ReplayEngine
 from src.infrastructure.workers.celery_app import celery_app
 
@@ -26,10 +27,12 @@ class ExecutionAPIRouter:
         replay_engine: ReplayEngine,
         events_service: EventService,
         executions_service: ExecutionService,
+        gdpr_deletion_service: GDPRDeletionService,
     ) -> None:
         self.replay_engine = replay_engine
         self.events_service = events_service
         self.executions_service = executions_service
+        self.gdpr_deletion_service = gdpr_deletion_service
 
         self.router = APIRouter()
 
@@ -39,6 +42,12 @@ class ExecutionAPIRouter:
             endpoint=self.create_execution,
             methods=["POST"],
             response_model=CreateExecutionResponse,
+        )
+        self.router.add_api_route(
+            "/{execution_id}",
+            endpoint=self.request_deletion,
+            methods=["DELETE"],
+            response_model=ExecutionStatusResponse,
         )
         self.router.add_api_route(
             "/{execution_id}/history",
@@ -122,6 +131,12 @@ class ExecutionAPIRouter:
             raise HTTPException(500, detail=str(e))
 
     # Mutations ----------------------------
+
+    async def request_deletion(
+        self,
+        request: Request,
+        execution_id: UUID,
+    ) -> ExecutionStatusResponse: ...
 
     async def create_execution(
         self,

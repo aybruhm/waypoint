@@ -1,6 +1,7 @@
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from src.domain.ports.events.interfaces import EventDAOInterface, EventModel
 from src.domain.services.events_schema_registry import EventSchemaRegistry
@@ -91,3 +92,18 @@ class EventDAO(EventDAOInterface):
                 self._map_dbe_to_model(dbe=event_dbe) for event_dbe in events_dbes
             ]
             return events_models
+
+    async def update_pii_fields(
+        self,
+        event_id: UUID,
+        input: dict[str, Any],
+        output: dict[str, Any],
+    ):
+        async with get_db_session() as session:
+            stmt = (
+                update(EventDBE)
+                .where(EventDBE.id == event_id)
+                .values(input=input, output=output)
+            )
+            await session.execute(stmt)
+            await session.commit()
