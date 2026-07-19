@@ -11,8 +11,8 @@ class AuditLogService:
     call .log() so there is a durable record of who did what and when.
     """
 
-    def __init__(self, audit_log_dao: AuditLogDAOInterface):
-        self._dao = audit_log_dao
+    def __init__(self, audit_logs_dao: AuditLogDAOInterface):
+        self._dao = audit_logs_dao
 
     async def log(
         self,

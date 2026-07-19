@@ -11,15 +11,15 @@ from src.domain.services.audit_log_service import AuditLogService
 class DeletionService:
     def __init__(
         self,
-        event_dao: EventDAOInterface,
-        execution_dao: ExecutionDAOInterface,
-        deletion_request_dao: DeletionRequestDAOInterface,
-        audit_log_service: AuditLogService,
+        events_dao: EventDAOInterface,
+        executions_dao: ExecutionDAOInterface,
+        deletion_requests_dao: DeletionRequestDAOInterface,
+        audit_logs_service: AuditLogService,
     ):
-        self._events = event_dao
-        self._executions = execution_dao
-        self._requests = deletion_request_dao
-        self._audit = audit_log_service
+        self._events = events_dao
+        self._executions = executions_dao
+        self._requests = deletion_requests_dao
+        self._audit = audit_logs_service
 
     def _mask_pii(self, data: dict[str, Any]) -> dict[str, Any]:
         """
