@@ -14,9 +14,9 @@ from src.application.models import (
     ReplayFromStepRequest,
 )
 from src.domain.exceptions import CheckpointNotFoundError
+from src.domain.services.deletion_service import DeletionService
 from src.domain.services.events_service import EventService
 from src.domain.services.executions_service import ExecutionService
-from src.domain.services.gdpr_deletion_service import GDPRDeletionService
 from src.domain.services.replay_engine import ReplayEngine
 from src.infrastructure.workers.celery_app import celery_app
 
@@ -27,12 +27,12 @@ class ExecutionAPIRouter:
         replay_engine: ReplayEngine,
         events_service: EventService,
         executions_service: ExecutionService,
-        gdpr_deletion_service: GDPRDeletionService,
+        deletion_service: DeletionService,
     ) -> None:
         self.replay_engine = replay_engine
         self.events_service = events_service
         self.executions_service = executions_service
-        self.gdpr_deletion_service = gdpr_deletion_service
+        self.deletion_service = deletion_service
 
         self.router = APIRouter()
 

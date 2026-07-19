@@ -8,7 +8,7 @@ from src.domain.ports.executions.interfaces import ExecutionDAOInterface
 from src.domain.services.audit_log_service import AuditLogService
 
 
-class GDPRDeletionService:
+class DeletionService:
     def __init__(
         self,
         event_dao: EventDAOInterface,
