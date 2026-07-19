@@ -12,7 +12,7 @@ from src.infrastructure.dbs.shared.enums import ExecutionStatus
 class ExecutionDBE(DBEBase):
     __tablename__ = "executions"
     __table_args__ = (
-        Index("idx_execution_agent_id", "agent_id"),
+        Index("idx_execution_workflow_id", "workflow_id"),
         Index("idx_execution_status", "status"),
         Index("idx_execution_created_at", "created_at"),
         Index("idx_execution_deleted_at", "deleted_at"),
@@ -29,7 +29,7 @@ class ExecutionDBE(DBEBase):
     )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid7)
-    agent_id = Column(String(255), nullable=False)
+    workflow_id = Column(String(255), nullable=False)
     status = Column(
         Enum(ExecutionStatus, name="execution_status_enum_types"), nullable=False
     )
