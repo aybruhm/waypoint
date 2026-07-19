@@ -12,11 +12,11 @@ class ExecutionService:
     # Mutations -----------------
     async def create_execution(
         self,
-        agent_id: str,
+        workflow_id: str,
         initial_input: Dict[str, Any] | None = None,
     ) -> ExecutionModel:
         execution = await self.execution_dao.create(
-            agent_id=agent_id,
+            workflow_id=workflow_id,
             initial_input=initial_input,
         )
         return execution

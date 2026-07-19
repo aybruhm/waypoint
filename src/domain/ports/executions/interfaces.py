@@ -9,7 +9,7 @@ class ExecutionDAOInterface(ABC):
     @abstractmethod
     async def create(
         self,
-        agent_id: str,
+        workflow_id: str,
         initial_input: Dict[str, Any] | None = None,
     ) -> ExecutionModel:
         raise NotImplementedError

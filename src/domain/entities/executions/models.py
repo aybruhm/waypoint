@@ -11,7 +11,7 @@ from src.domain.shared.types import EXECUTION_STATUSES
 @dataclass(slots=True)
 class ExecutionModel:
     id: UUID
-    agent_id: str
+    workflow_id: str
     status: EXECUTION_STATUSES
     started_at: datetime
     completed_at: datetime | None = None

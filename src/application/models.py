@@ -6,13 +6,13 @@ from pydantic import BaseModel, Field
 
 
 class CreateExecutionRequest(BaseModel):
-    agent_id: str
+    workflow_id: str
     initial_input: Dict[str, Any] | None = None
 
 
 class CreateExecutionResponse(BaseModel):
     id: UUID
-    agent_id: str
+    workflow_id: str
     status: str
     started_at: datetime
     initial_input: Dict[str, Any] | None = None
@@ -42,7 +42,7 @@ class ExecutionStatusResponse(BaseModel):
 
 class ExecutionHistoryResponse(BaseModel):
     execution_id: UUID
-    agent_id: str
+    workflow_id: str
     status: str
     started_at: datetime
     completed_at: datetime | None = None

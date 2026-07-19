@@ -146,7 +146,7 @@ class ExecutionAPIRouter:
         try:
             initial_input = body.initial_input or {}
             execution = await self.executions_service.create_execution(
-                agent_id=body.agent_id,
+                workflow_id=body.workflow_id,
                 initial_input=initial_input,
             )
             return ExecutionStatusResponse(
