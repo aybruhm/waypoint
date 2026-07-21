@@ -12,12 +12,12 @@ import asyncio
 
 from sdk import Waypoint, checkpoint
 
-AGENT_ID = "simple_agent"
+WORKFLOW_ID = "simple_agent"
 API_BASE_URL = "http://localhost:9654/api/v1/"
 
 waypoint = Waypoint(
     base_url=API_BASE_URL,
-    agent_id=AGENT_ID,
+    workflow_id=WORKFLOW_ID,
 ).use()
 
 
