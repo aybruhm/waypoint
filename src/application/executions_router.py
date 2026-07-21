@@ -142,16 +142,20 @@ class ExecutionAPIRouter:
         self,
         request: Request,
         body: CreateExecutionRequest,
-    ) -> ExecutionStatusResponse:
+    ) -> CreateExecutionResponse:
         try:
             initial_input = body.initial_input or {}
             execution = await self.executions_service.create_execution(
                 workflow_id=body.workflow_id,
                 initial_input=initial_input,
             )
-            return ExecutionStatusResponse(
-                execution_id=execution.id,
+            return CreateExecutionResponse(
+                id=execution.id,
+                workflow_id=execution.workflow_id,
                 status=execution.status,
+                initial_input=execution.initial_input,
+                created_at=execution.created_at,
+                started_at=execution.started_at,
             )
         except Exception as e:
             traceback.print_exc()
