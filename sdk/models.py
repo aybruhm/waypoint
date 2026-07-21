@@ -47,7 +47,7 @@ class ExecutionStep:
 @dataclass(frozen=True)
 class ExecutionHistory:
     execution_id: UUID
-    agent_id: str
+    workflow_id: str
     status: str
     started_at: datetime
     completed_at: datetime | None = None
@@ -57,7 +57,7 @@ class ExecutionHistory:
 @dataclass(frozen=True)
 class ExecutionInfo:
     id: UUID
-    agent_id: str
+    workflow_id: str
     status: str
     started_at: datetime
     initial_input: dict[str, Any] | None = None
