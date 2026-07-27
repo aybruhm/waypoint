@@ -1,8 +1,8 @@
 # Waypoint
 
-A Python SDK for making LLM agent workflows fault-tolerant via event sourcing.
+A Python SDK for building fault-tolerant multi-step workflows via event sourcing.
 
-When an agent crashes mid-execution, Waypoint lets you resume from the last successful step—without re-running LLM calls or tool invocations that already completed. It does this by logging every step's input/output to an append-only PostgreSQL journal, then replaying from checkpoints on recovery.
+When a workflow crashes mid-execution, Waypoint resumes from the last successful step, without re-running expensive operations that already completed. Every step's input and output is logged to an append-only PostgreSQL journal; on recovery, the journal is replayed from the last checkpoint.
 
 ## Getting Started
 
@@ -30,12 +30,23 @@ make run_migrations
 ### Run Examples
 
 ```sh
-# 3-step agent, no LLM
+# 3-step search workflow with crash recovery
 uv run python -m sdk.examples.simple_agent
 
 # Mocked LLM + crash recovery demo
 uv run python -m sdk.examples.agent_with_llm_mock
+
+# Nightly ETL sync: cache=True on expensive external API fetch
+uv run python -m sdk.examples.data_pipeline
+
+# E-commerce order pipeline: WaypointSession + cache on payment to prevent double-charge
+uv run python -m sdk.examples.order_processing
+
+# RAG pipeline: @waypoint.checkpoint instance decorator + class-based steps
+uv run python -m sdk.examples.document_rag
 ```
+
+See [`sdk/examples/`](sdk/examples/) for the full source of each example, including crash recovery demos.
 
 ### Stop
 
@@ -59,30 +70,32 @@ make down
 
 ## What It Solves
 
-LLM agent crashes create three problems:
+Any multi-step process where re-running from scratch is expensive, slow, or dangerous:
 
-1. **Wasted spend**: LLM calls that succeeded before the crash get re-invoked on retry.
-2. **Lost context**: No record of what happened, what state the agent was in, or which step failed.
-3. **Duplicate effects**: Retrying a tool call (e.g., an API write) can create duplicates or break idempotency.
+1. **Wasted computation**: Steps that succeeded before the crash get re-run on retry: re-fetching from slow APIs, re-processing records, re-calling LLM endpoints.
+2. **Lost state**: No record of which step failed, what the inputs were, or how far execution got.
+3. **Duplicate side effects**: Retrying a workflow that already charged a card, sent an email, or wrote to an external system creates duplicates or breaks idempotency.
 
-Waypoint avoids all three by persisting every step's result. On crash, you resume from the checkpoint—cached LLM responses return instantly, tool outputs are reused, and execution continues from the next step.
+Waypoint avoids all three by persisting every step's result. On crash, resume from the checkpoint: completed steps return their stored outputs instantly and execution continues from the next uncompleted step.
 
 ---
 
 ## Architecture
 
 ```
-Agent Code
+Workflow Code
     ↓
 @checkpoint decorators (Waypoint SDK)
     ↓
-┌────────────────┬─────────────────┬──────────────────┐
-│ Event Journal  │ Checkpoint Mgr  │ Replay Engine    │
-│ (append-only)  │ (progress)      │ (deterministic)  │
-└────────────────┴─────────────────┴──────────────────┘
++----------------+-----------------+------------------+
+| Event Journal  | Checkpoint Mgr  | Replay Engine    |
+| (append-only)  | (progress)      | (deterministic)  |
++----------------+-----------------+------------------+
     ↓
 PostgreSQL
 ```
+
+For the full breakdown: component reference, data model, and runtime communication flows, see [docs/architecture.md](docs/architecture.md).
 
 ---
 
@@ -90,62 +103,84 @@ PostgreSQL
 
 | Concept | Description |
 |---------|-------------|
-| **Execution** | A single run of an agent workflow, identified by a UUID. |
-| **Step** | A decorated async function (`@checkpoint("name")`). Each step runs once per execution. |
+| **Execution** | A single run of a workflow, identified by a UUID. |
+| **Step** | A decorated async function (`@checkpoint("name")`). Each step runs at most once per execution. |
 | **Checkpoint** | A persisted record of a step's input/output + execution position. |
 | **Event Journal** | Append-only log of all steps across all executions (PostgreSQL). |
-| **Replay** | Reconstructing state by reading checkpoints in order, skipping re-execution. |
+| **Replay** | Reconstructing state by reading checkpoints in order, without re-executing steps. |
 
 ---
 
 ## How It Works
 
-```
-@checkpoint("step_name")
-async def my_step(input):
+```python
+@checkpoint("step_name", cache=True)
+async def my_step(input: dict) -> dict:
     return output
 ```
 
 The decorator:
 1. Checks if a checkpoint exists for this step in the current execution.
-2. If yes: returns cached output immediately (no function execution).
+2. If yes and `cache=True`: returns stored output immediately (no re-execution).
 3. If no: runs the function, persists input/output as a checkpoint, returns output.
 
 On crash, create a new `Waypoint` instance and call `resume(execution_id)`. The SDK rebuilds state from the journal and continues from the next uncompleted step.
 
 ---
 
+## Integration Patterns
+
+**Standalone decorator**: simplest, steps registered at module level:
+
+```python
+waypoint = Waypoint(base_url=..., workflow_id="my_pipeline").use()
+
+@checkpoint("fetch_data", cache=True)
+async def fetch_data(url: str) -> dict: ...
+```
+
+**Instance decorator**: steps explicitly bound to a specific `Waypoint` instance:
+
+```python
+waypoint = Waypoint(base_url=..., workflow_id="my_pipeline")
+
+@waypoint.checkpoint("fetch_data", cache=True)
+async def fetch_data(url: str) -> dict: ...
+```
+
+**Session context manager**: scopes a series of steps to a single execution, useful when steps are defined as plain functions rather than decorated at import time:
+
+```python
+async with waypoint.session(execution_id) as sess:
+    result = await sess.async_execute("step_name", {"arg": val, "__callable__": fn}, cache=True)
+```
+
+---
+
 ## Key Properties
 
-- **Deterministic replay** — Same inputs always produce same outputs; no re-execution.
-- **LLM call caching** — Cached responses are returned on replay (zero token cost).
-- **Framework-agnostic** — Works with LangChain, CrewAI, custom async agents, FastAPI, etc.
-- **Minimal integration** — Add `@checkpoint` decorators (one per step). ~3 lines of change per step.
-- **Full history** — Query every step, error, and state transition by execution ID.
+- **Deterministic replay**: Same inputs always produce the same outputs; completed steps never re-execute.
+- **Step output caching**: Outputs marked `cache=True` are served from the journal on replay (zero re-computation cost).
+- **Non-idempotent step protection**: Mark payment charges, email sends, or any one-shot side effect as `cache=True` to guarantee they run at most once across retries.
+- **Framework-agnostic**: Works with LangChain, CrewAI, FastAPI, plain asyncio, or any async Python code.
+- **Minimal integration**: Add `@checkpoint` to each step. ~3 lines of change per step.
+- **Full history**: Query every step, error, duration, and state transition by execution ID.
 
 ---
 
 ## When to Use
 
-- Long-running agent workflows (minutes to hours) where crashes are expensive.
-- Cost-sensitive apps where re-calling LLMs on retry is unacceptable.
-- Teams needing audit trails for agent behavior and debugging.
-- Agent-as-a-service platforms running untrusted/user-submitted agents.
+- Long-running workflows (minutes to hours) where restarting from scratch is expensive.
+- Cost-sensitive pipelines where re-running steps wastes money (LLM API calls, paid data sources, cloud processing).
+- Financial or transactional workflows where duplicate side effects (double charges, duplicate sends) must be prevented.
+- ETL jobs where the extraction phase is slow or rate-limited and re-fetching on failure is unacceptable.
+- Teams needing a full audit trail of step inputs, outputs, and errors for debugging.
 
 ---
 
-## When Not to Use (Next Steps)
+## When Not to Use
 
-- Distributed/multi-machine workflows (Waypoint is single-process).
-- High-throughput task queues (use Celery, Temporal, etc.).
-- Simple chatbots with no multi-step orchestration.
+- Distributed/multi-machine workflows (Waypoint is single-process per execution).
+- Stateless, fire-and-forget tasks with no recovery requirement: if a task fails you're happy restarting it from scratch, use Celery, SQS, or similar.
+- Simple linear scripts with no expensive steps and no side effects worth protecting.
 
----
-
-## Stack
-
-- Python 3.13+
-- asyncio
-- FastAPI (gateway demo only; SDK is framework-agnostic)
-- PostgreSQL (events + checkpoints)
-- Pydantic + JSON serialization

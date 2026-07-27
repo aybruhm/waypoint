@@ -1,28 +1,32 @@
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from src.domain.ports.events.interfaces import EventDAOInterface, EventModel
+from src.domain.services.events_schema_registry import EventSchemaRegistry
 from src.infrastructure.dbs.postgres.engine import get_db_session
 from src.infrastructure.dbs.postgres.events.dbes import EventDBE
 
 
 class EventDAO(EventDAOInterface):
     def _map_dbe_to_model(self, dbe: EventDBE) -> EventModel:
-        return EventModel(
-            id=UUID(str(dbe.id)),
-            execution_id=UUID(str(dbe.execution_id)),
-            step_number=dbe.step_number,  # type: ignore
-            step_name=dbe.step_name,  # type: ignore
-            input=dbe.input,  # type: ignore
-            output=dbe.output,  # type: ignore
-            status=dbe.status,  # type: ignore
-            side_effects=dbe.side_effects,  # type: ignore
-            cached=dbe.cached,  # type: ignore
-            error=dbe.error,  # type: ignore
-            duration_ms=dbe.duration_ms,  # type: ignore
-            created_at=dbe.created_at,  # type: ignore
-        )
+        raw = {
+            "id": dbe.id,
+            "execution_id": dbe.execution_id,
+            "step_number": dbe.step_number,
+            "step_name": dbe.step_name,
+            "input": dbe.input,
+            "output": dbe.output,
+            "status": dbe.status,
+            "side_effects": dbe.side_effects,
+            "cached": dbe.cached,
+            "error": dbe.error,
+            "duration_ms": dbe.duration_ms,
+            "schema_version": getattr(dbe, "schema_version", None) or 1,
+            "created_at": dbe.created_at.isoformat(),
+        }
+        return EventSchemaRegistry.deserialize(raw=raw)
 
     async def create(self, event: EventModel) -> EventModel:
         async with get_db_session() as session:
@@ -44,6 +48,27 @@ class EventDAO(EventDAOInterface):
 
             event_model = self._map_dbe_to_model(dbe=event_dbe)
             return event_model
+
+    async def insert_batch(self, events: list[EventModel]) -> None:
+        async with get_db_session() as session:
+            dbes = [
+                EventDBE(
+                    execution_id=event.execution_id,
+                    step_number=event.step_number,
+                    step_name=event.step_name,
+                    input=event.input,
+                    output=event.output,
+                    side_effects=event.side_effects,
+                    cached=event.cached,
+                    status=event.status,
+                    error=event.error,
+                    duration_ms=event.duration_ms,
+                )
+                for event in events
+            ]
+
+            session.add_all(dbes)
+            await session.commit()
 
     async def query(
         self,
@@ -67,3 +92,18 @@ class EventDAO(EventDAOInterface):
                 self._map_dbe_to_model(dbe=event_dbe) for event_dbe in events_dbes
             ]
             return events_models
+
+    async def update_pii_fields(
+        self,
+        event_id: UUID,
+        input: dict[str, Any],
+        output: dict[str, Any],
+    ):
+        async with get_db_session() as session:
+            stmt = (
+                update(EventDBE)
+                .where(EventDBE.id == event_id)
+                .values(input=input, output=output)
+            )
+            await session.execute(stmt)
+            await session.commit()

@@ -6,13 +6,13 @@ from pydantic import BaseModel, Field
 
 
 class CreateExecutionRequest(BaseModel):
-    agent_id: str
+    workflow_id: str
     initial_input: Dict[str, Any] | None = None
 
 
 class CreateExecutionResponse(BaseModel):
     id: UUID
-    agent_id: str
+    workflow_id: str
     status: str
     started_at: datetime
     initial_input: Dict[str, Any] | None = None
@@ -33,9 +33,16 @@ class ExecutionStep(BaseModel):
     timestamp: str
 
 
+class ExecutionStatusResponse(BaseModel):
+    execution_id: UUID
+    status: str
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
 class ExecutionHistoryResponse(BaseModel):
     execution_id: UUID
-    agent_id: str
+    workflow_id: str
     status: str
     started_at: datetime
     completed_at: datetime | None = None

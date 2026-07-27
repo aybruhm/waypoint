@@ -1,7 +1,7 @@
-container_name = waypoint-ahandler
+container_name = waypoint-gateway
 compose_file = compose.yml
 
-.PHONY: up down start stop test_ci_workflow add_migration run_migrations revert_migrations show_current_db_head show_db_heads
+.PHONY: up down start stop test_ci_workflow add_migration run_migrations revert_migrations show_current_db_head show_db_heads exec_db
 
 up start:
 	docker compose -f $(compose_file) up -d --build
@@ -14,6 +14,9 @@ show_current_db_head:
 
 show_db_heads:
 	docker exec $(container_name) python -m alembic heads
+
+exec_db:
+	docker compose -f $(compose_file) exec db /bin/sh -c "psql -U waypoint -d waypoint_db;"
 
 test_ci_workflow:
 	@command -v act > /dev/null 2>&1 || (echo "Error: 'act' is not installed or not in PATH. See https://github.com/nektos/act" && exit 1)

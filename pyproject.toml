@@ -1,13 +1,14 @@
 [project]
 name = "waypoint-sdk"
 version = "0.1.0"
-description = "A lightweight Python SDK for building fault-tolerant LLM agent workflows. It enables agent systems to recover from crashes by replaying execution from checkpoints, without re-invoking deterministic operations like LLM calls or completed tool invocations."
+description = "A Python SDK for building fault-tolerant multi-step workflows. Workflows recover from crashes by replaying execution from checkpoints, skipping steps that already completed — eliminating redundant computation, protecting non-idempotent side effects, and preserving full execution history."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiohttp>=3.13.5",
     "alembic>=1.18.4",
     "asyncpg>=0.31.0",
+    "celery>=5.6.3",
     "fastapi>=0.136.3",
     "httpx>=0.28.0",
     "pydantic>=2.13.4",
@@ -17,6 +18,7 @@ dependencies = [
     "sqlalchemy-json>=0.7.0",
     "uuid-utils>=0.16.0",
     "uvicorn>=0.48.0",
+    "zstandard>=0.25.0",
 ]
 
 [build-system]
