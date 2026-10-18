@@ -1,6 +1,6 @@
 [project]
 name = "waypoint-sdk"
-version = "0.1.0"
+version = "0.1.1"
 description = "A Python SDK for building fault-tolerant multi-step workflows. Workflows recover from crashes by replaying execution from checkpoints, skipping steps that already completed — eliminating redundant computation, protecting non-idempotent side effects, and preserving full execution history."
 readme = "README.md"
 requires-python = ">=3.13"
