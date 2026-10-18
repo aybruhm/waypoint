@@ -66,7 +66,7 @@ class StateMetadataDAO:
                     model=model,
                 )
 
-            state_metadata_dbe = result.scalar_one()
+            await session.commit()
             state_metadata_model = self._map_dbe_to_model(state_metadata_dbe)
             return state_metadata_model
 
