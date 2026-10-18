@@ -95,8 +95,6 @@ Workflow Code
 PostgreSQL
 ```
 
-For the full breakdown: component reference, data model, and runtime communication flows, see [docs/architecture.md](docs/architecture.md).
-
 ---
 
 ## Core Concepts
