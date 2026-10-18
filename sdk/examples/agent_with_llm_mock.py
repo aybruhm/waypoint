@@ -17,12 +17,12 @@ import asyncio
 
 from sdk import Waypoint, checkpoint
 
-AGENT_ID = "llm_agent"
+WORKFLOW_ID = "llm_agent"
 API_BASE_URL = "http://localhost:9654/api/v1/"
 
 waypoint = Waypoint(
     base_url=API_BASE_URL,
-    agent_id=AGENT_ID,
+    workflow_id=WORKFLOW_ID,
 ).use()
 
 
@@ -83,10 +83,7 @@ async def crash_recovery_demo(execution_id):
     print("\n--- CRASH RECOVERY ---")
     print(f"Resuming execution {execution_id}...")
 
-    waypoint2 = Waypoint(
-        base_url=API_BASE_URL,
-        agent_id=AGENT_ID,
-    ).use()
+    waypoint2 = Waypoint(base_url=API_BASE_URL, workflow_id=WORKFLOW_ID).use()
 
     resume = await waypoint2.resume(execution_id)
     print(f"Resumed from step {resume.checkpoint_step}")

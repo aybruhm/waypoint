@@ -29,14 +29,14 @@ _current_waypoint: contextvars.ContextVar[Waypoint | None] = contextvars.Context
 
 class Waypoint:
     """
-    Waypoint is the single entry point for agent execution recovery.
+    Waypoint is the single entry point for workflow execution recovery.
 
     Usage patterns
     ──────────────
     1. Decorator (recommended):
 
         ```python
-        waypoint = Waypoint(base_url=..., agent_id=...)
+        waypoint = Waypoint(base_url=..., workflow_id=...)
         await waypoint.resume(execution_id)
 
         @waypoint.checkpoint("load_query")
@@ -49,7 +49,7 @@ class Waypoint:
     2. Standalone decorator (no instance reference needed):
 
         ```python
-        waypoint = Waypoint(base_url=..., agent_id=...).use()
+        waypoint = Waypoint(base_url=..., workflow_id=...).use()
         await waypoint.resume(execution_id)
 
         @checkpoint("load_query")
@@ -75,13 +75,13 @@ class Waypoint:
         self,
         *,
         base_url: str,
-        agent_id: str,
+        workflow_id: str,
         timeout: float = 30.0,
         api_key: str | None = None,
     ) -> None:
         self._client = WaypointClient(
             base_url=base_url,
-            agent_id=agent_id,
+            workflow_id=workflow_id,
             timeout=timeout,
             api_key=api_key,
         )
@@ -131,14 +131,14 @@ class Waypoint:
         """Create a new execution and set it as the active execution."""
 
         info = await self._client.create_execution(
-            agent_id=self._client.agent_id,
+            workflow_id=self._client.workflow_id,
             initial_input=initial_input,
         )
         self._execution_id = info.id
         self._step_number = 0
         self._state = {}
         self._initialized = True
-        log.info("Created execution %s for agent %s", info.id, info.agent_id)
+        log.info("Created execution %s for workflow %s", info.id, info.workflow_id)
         return info.id
 
     # ── resume ───────────────────────────────────────────────────────────────────
@@ -384,7 +384,7 @@ def checkpoint(
         ```python
         from sdk import Waypoint, checkpoint
 
-        waypoint = Waypoint(base_url=..., agent_id=...).use()
+        waypoint = Waypoint(base_url=..., workflow_id=...).use()
         await waypoint.resume(execution_id)
 
         @checkpoint("load_query")

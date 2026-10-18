@@ -27,22 +27,19 @@ class WaypointClient:
     """
     Low-level HTTP client for the Waypoint API.
 
-    Manages reusable httpx clients (sync and async) with lazy initialisation,
-    thread-safety locks, and explicit close/aclose lifecycle.
-
-    Every public method maps to exactly one API endpoint.
+    Manages reusable httpx clients (sync and async) with lazy initialisation, thread-safety locks, and explicit close/aclose lifecycle.
     """
 
     def __init__(
         self,
         *,
         base_url: str,
-        agent_id: str,
+        workflow_id: str,
         timeout: float = 30.0,
         api_key: str | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self.agent_id = agent_id
+        self.workflow_id = workflow_id
         self.timeout = timeout
         self.api_key = api_key
 
@@ -108,6 +105,8 @@ class WaypointClient:
             return f"/executions/{execution_id}/resume"
         if resource == "replay":
             return f"/executions/{execution_id}/replay"
+        if resource == "delete":
+            return f"/executions/{execution_id}"
         msg = f"Unknown resource: {resource}"
         raise ValueError(msg)
 
@@ -145,20 +144,20 @@ class WaypointClient:
 
     async def create_execution(
         self,
-        agent_id: str,
+        workflow_id: str,
         initial_input: dict[str, Any] | None = None,
     ) -> ExecutionInfo:
         body = await self._arequest(
             "POST",
             "/executions/",
             json_body={
-                "agent_id": agent_id,
+                "workflow_id": workflow_id,
                 "initial_input": initial_input,
             },
         )
         return ExecutionInfo(
             id=UUID(body["id"]) if isinstance(body["id"], str) else body["id"],
-            agent_id=body["agent_id"],
+            workflow_id=body["workflow_id"],
             status=body["status"],
             started_at=body["started_at"],
             initial_input=body.get("initial_input"),
@@ -247,7 +246,7 @@ class WaypointClient:
             execution_id=UUID(body["execution_id"])
             if isinstance(body["execution_id"], str)
             else body["execution_id"],
-            agent_id=body["agent_id"],
+            workflow_id=body["workflow_id"],
             status=body["status"],
             started_at=body["started_at"],
             completed_at=body.get("completed_at"),

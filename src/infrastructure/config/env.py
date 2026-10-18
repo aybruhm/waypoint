@@ -20,6 +20,8 @@ class EnvironSettings(BaseSettings):
             "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres",
         )
     )
+    BROKER_URL: str = Field(default="redis://localhost:6379/0")
+    BROKER_BACKEND_URL: str = Field(default="redis://localhost:6379/0")
 
     # API
     SECRET_KEY: str = Field(default="dummy-value")

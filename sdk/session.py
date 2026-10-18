@@ -73,7 +73,12 @@ class WaypointSession:
     # ── async context manager ──────────────────────────────────────────────────
 
     async def __aenter__(self) -> WaypointSession:
-        await self._gateway.resume(self.execution_id)
+        already_initialized = (
+            self._gateway._initialized
+            and self._gateway._execution_id == self.execution_id
+        )
+        if not already_initialized:
+            await self._gateway.resume(self.execution_id)
         return self
 
     async def __aexit__(self, *_: Any) -> None:

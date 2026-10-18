@@ -9,15 +9,16 @@ Usage:
 """
 
 import asyncio
+from uuid import UUID
 
 from sdk import Waypoint, checkpoint
 
-AGENT_ID = "simple_agent"
+WORKFLOW_ID = "simple_agent"
 API_BASE_URL = "http://localhost:9654/api/v1/"
 
 waypoint = Waypoint(
     base_url=API_BASE_URL,
-    agent_id=AGENT_ID,
+    workflow_id=WORKFLOW_ID,
 ).use()
 
 
@@ -41,7 +42,7 @@ async def summarize(data: dict):
     return {**data, "summary": summary}
 
 
-async def main():
+async def first_run() -> UUID:
     execution_id = await waypoint.create()
     print(f"Created execution: {execution_id}")
 
@@ -62,6 +63,42 @@ async def main():
         print(f"Execution failed: {e}")
         raise
 
+    return execution_id
+
+
+async def crash_recovery_demo(execution_id: UUID) -> None:
+    """
+    Simulate a crash after 'search' and before 'summarize'.
+
+    On resume:
+      - load_query → cache=False, re-executes (same input → same output)
+      - search     → cache=False, re-executes (same input → same output)
+      - summarize  → cache=True, served from journal (no recompute)
+    """
+    print("\n--- CRASH RECOVERY ---")
+    print(f"Resuming execution {execution_id}...")
+
+    waypoint2 = Waypoint(base_url=API_BASE_URL, workflow_id=WORKFLOW_ID).use()
+    resume = await waypoint2.resume(execution_id)
+    print(f"Resumed from step {resume.checkpoint_step}")
+    print(f"Recovered state keys: {list(waypoint2.get_state().keys())}")
+
+    step1 = await load_query(query="What is Waypoint?")
+    print("Step 1 (load_query, fresh — cache=False): re-executed")
+
+    step2 = await search(data=step1)
+    print("Step 2 (search, fresh — cache=False): re-executed")
+
+    step3 = await summarize(data=step2)
+    print(f"Step 3 (summarize, CACHED — cache=True): {step3['summary']}")
+
+    print(f"\nRecovery complete! Total steps: {waypoint2.get_step_number()}")
+    await waypoint2.aclose()
+
+
+async def main():
+    execution_id = await first_run()
+    await crash_recovery_demo(execution_id)
     await waypoint.aclose()
 
 

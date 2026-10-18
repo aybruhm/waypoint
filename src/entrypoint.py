@@ -4,11 +4,15 @@ from fastapi import APIRouter, FastAPI
 
 from src.application.checkpoints_router import CheckpointAPIRouter
 from src.application.executions_router import ExecutionAPIRouter
+from src.domain.services.audit_log_service import AuditLogService
 from src.domain.services.checkpoints_service import CheckpointService
+from src.domain.services.deletion_service import DeletionService
 from src.domain.services.events_service import EventService
 from src.domain.services.executions_service import ExecutionService
 from src.domain.services.replay_engine import ReplayEngine
+from src.infrastructure.dbs.postgres.audit_logs.daos import AuditLogDAO
 from src.infrastructure.dbs.postgres.checkpoints.daos import CheckpointDAO
+from src.infrastructure.dbs.postgres.deletion_requests.daos import DeletionRequestDAO
 from src.infrastructure.dbs.postgres.engine import check_connection, cleanup_connections
 from src.infrastructure.dbs.postgres.events.daos import EventDAO
 from src.infrastructure.dbs.postgres.executions.daos import ExecutionDAO
@@ -46,6 +50,8 @@ async def check_server_health():
 events_dao = EventDAO()
 checkpoints_dao = CheckpointDAO()
 executions_dao = ExecutionDAO()
+deletion_requests_dao = DeletionRequestDAO()
+audit_logs_dao = AuditLogDAO()
 
 # Initialize services
 events_service = EventService(event_dao=events_dao)
@@ -55,12 +61,20 @@ replay_engine = ReplayEngine(
     events_service=events_service,
     checkpoints_service=checkpoints_service,
 )
+audit_logs_service = AuditLogService(audit_logs_dao=audit_logs_dao)
+deletion_service = DeletionService(
+    events_dao=events_dao,
+    executions_dao=executions_dao,
+    deletion_requests_dao=deletion_requests_dao,
+    audit_logs_service=audit_logs_service,
+)
 
 # Initialize routers
 execution_router = ExecutionAPIRouter(
     replay_engine=replay_engine,
     events_service=events_service,
     executions_service=executions_service,
+    deletion_service=deletion_service,
 )
 checkpoint_router = CheckpointAPIRouter(
     checkpoints_service=checkpoints_service,

@@ -1,7 +1,6 @@
 import traceback
-from uuid import UUID
-
 from dataclasses import asdict
+from uuid import UUID
 
 from fastapi import APIRouter, Query, Request
 from fastapi.exceptions import HTTPException
@@ -10,13 +9,16 @@ from src.application.models import (
     CreateExecutionRequest,
     CreateExecutionResponse,
     ExecutionHistoryResponse,
+    ExecutionStatusResponse,
     ExecutionStep,
     ReplayFromStepRequest,
 )
 from src.domain.exceptions import CheckpointNotFoundError
+from src.domain.services.deletion_service import DeletionService
 from src.domain.services.events_service import EventService
 from src.domain.services.executions_service import ExecutionService
 from src.domain.services.replay_engine import ReplayEngine
+from src.infrastructure.workers.celery_app import celery_app
 
 
 class ExecutionAPIRouter:
@@ -25,10 +27,12 @@ class ExecutionAPIRouter:
         replay_engine: ReplayEngine,
         events_service: EventService,
         executions_service: ExecutionService,
+        deletion_service: DeletionService,
     ) -> None:
         self.replay_engine = replay_engine
         self.events_service = events_service
         self.executions_service = executions_service
+        self.deletion_service = deletion_service
 
         self.router = APIRouter()
 
@@ -38,6 +42,12 @@ class ExecutionAPIRouter:
             endpoint=self.create_execution,
             methods=["POST"],
             response_model=CreateExecutionResponse,
+        )
+        self.router.add_api_route(
+            "/{execution_id}",
+            endpoint=self.request_deletion,
+            methods=["DELETE"],
+            response_model=ExecutionStatusResponse,
         )
         self.router.add_api_route(
             "/{execution_id}/history",
@@ -52,33 +62,44 @@ class ExecutionAPIRouter:
             response_model=dict,
         )
         self.router.add_api_route(
+            "/{execution_id}/status",
+            endpoint=self.get_execution_status,
+            methods=["GET"],
+            response_model=ExecutionStatusResponse,
+        )
+        self.router.add_api_route(
+            "/{execution_id}/cancel",
+            endpoint=self.cancel_execution,
+            methods=["POST"],
+            response_model=ExecutionStatusResponse,
+        )
+        self.router.add_api_route(
             "/{execution_id}/replay",
             endpoint=self.replay_from_step,
             methods=["POST"],
             response_model=dict,
         )
 
-    async def create_execution(
+    # Queries -----------------------------
+
+    async def get_execution_status(
         self,
         request: Request,
-        body: CreateExecutionRequest,
-    ):
-        try:
-            execution = await self.executions_service.create_execution(
-                agent_id=body.agent_id,
-                initial_input=body.initial_input,
+        execution_id: UUID,
+    ) -> ExecutionStatusResponse:
+        execution = await self.executions_service.get_by_id(execution_id=execution_id)
+        if not execution:
+            raise HTTPException(
+                status_code=404, detail=f"Execution with ID {execution_id} not found"
             )
-            return CreateExecutionResponse(
-                id=execution.id,
-                agent_id=execution.agent_id,
-                status=execution.status,
-                started_at=execution.started_at,
-                initial_input=execution.initial_input,
-                created_at=execution.created_at,
-            )
-        except Exception as e:
-            traceback.print_exc()
-            raise HTTPException(500, detail=str(e))
+
+        execution_status = ExecutionStatusResponse(
+            execution_id=execution.id,
+            status=execution.status,
+            started_at=execution.started_at,
+            completed_at=execution.completed_at,
+        )
+        return execution_status
 
     async def get_execution_history(
         self,
@@ -109,6 +130,37 @@ class ExecutionAPIRouter:
         except Exception as e:
             raise HTTPException(500, detail=str(e))
 
+    # Mutations ----------------------------
+
+    async def request_deletion(
+        self,
+        request: Request,
+        execution_id: UUID,
+    ) -> ExecutionStatusResponse: ...
+
+    async def create_execution(
+        self,
+        request: Request,
+        body: CreateExecutionRequest,
+    ) -> CreateExecutionResponse:
+        try:
+            initial_input = body.initial_input or {}
+            execution = await self.executions_service.create_execution(
+                workflow_id=body.workflow_id,
+                initial_input=initial_input,
+            )
+            return CreateExecutionResponse(
+                id=execution.id,
+                workflow_id=execution.workflow_id,
+                status=execution.status,
+                initial_input=execution.initial_input,
+                created_at=execution.created_at,
+                started_at=execution.started_at,
+            )
+        except Exception as e:
+            traceback.print_exc()
+            raise HTTPException(500, detail=str(e))
+
     async def resume_execution(
         self,
         request: Request,
@@ -134,6 +186,33 @@ class ExecutionAPIRouter:
             return asdict(result)
         except CheckpointNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
+
+    async def cancel_execution(
+        self,
+        request: Request,
+        execution_id: UUID,
+    ) -> ExecutionStatusResponse:
+        execution = await self.executions_service.get_by_id(execution_id=execution_id)
+        if not execution:
+            raise HTTPException(
+                status_code=404, detail=f"Execution with ID {execution_id} not found"
+            )
+        if execution.status not in ("queued", "running"):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot cancel an execution in status '{execution.status}'",
+            )
+
+        celery_app.control.revoke(str(execution_id), terminate=True)
+        updated = await self.executions_service.update_status(execution_id, "cancelled")
+        if not updated:
+            raise HTTPException(
+                status_code=404, detail=f"Execution with ID {execution_id} not found"
+            )
+
+        return ExecutionStatusResponse(
+            execution_id=updated.id, status=str(updated.status)
+        )
 
     async def replay_from_step(
         self,
