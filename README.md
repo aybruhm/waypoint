@@ -66,8 +66,6 @@ make down
 | `make show_current_db_head` | Show current migration version |
 | `make show_db_heads` | List all migration heads |
 
----
-
 ## What It Solves
 
 Any multi-step process where re-running from scratch is expensive, slow, or dangerous:
@@ -77,8 +75,6 @@ Any multi-step process where re-running from scratch is expensive, slow, or dang
 3. **Duplicate side effects**: Retrying a workflow that already charged a card, sent an email, or wrote to an external system creates duplicates or breaks idempotency.
 
 Waypoint avoids all three by persisting every step's result. On crash, resume from the checkpoint: completed steps return their stored outputs instantly and execution continues from the next uncompleted step.
-
----
 
 ## Architecture
 
@@ -95,8 +91,6 @@ Workflow Code
 PostgreSQL
 ```
 
----
-
 ## Core Concepts
 
 | Concept | Description |
@@ -106,8 +100,6 @@ PostgreSQL
 | **Checkpoint** | A persisted record of a step's input/output + execution position. |
 | **Event Journal** | Append-only log of all steps across all executions (PostgreSQL). |
 | **Replay** | Reconstructing state by reading checkpoints in order, without re-executing steps. |
-
----
 
 ## How It Works
 
@@ -123,8 +115,6 @@ The decorator:
 3. If no: runs the function, persists input/output as a checkpoint, returns output.
 
 On crash, create a new `Waypoint` instance and call `resume(execution_id)`. The SDK rebuilds state from the journal and continues from the next uncompleted step.
-
----
 
 ## Integration Patterns
 
@@ -153,8 +143,6 @@ async with waypoint.session(execution_id) as sess:
     result = await sess.async_execute("step_name", {"arg": val, "__callable__": fn}, cache=True)
 ```
 
----
-
 ## Key Properties
 
 - **Deterministic replay**: Same inputs always produce the same outputs; completed steps never re-execute.
@@ -164,8 +152,6 @@ async with waypoint.session(execution_id) as sess:
 - **Minimal integration**: Add `@checkpoint` to each step. ~3 lines of change per step.
 - **Full history**: Query every step, error, duration, and state transition by execution ID.
 
----
-
 ## When to Use
 
 - Long-running workflows (minutes to hours) where restarting from scratch is expensive.
@@ -173,8 +159,6 @@ async with waypoint.session(execution_id) as sess:
 - Financial or transactional workflows where duplicate side effects (double charges, duplicate sends) must be prevented.
 - ETL jobs where the extraction phase is slow or rate-limited and re-fetching on failure is unacceptable.
 - Teams needing a full audit trail of step inputs, outputs, and errors for debugging.
-
----
 
 ## When Not to Use
 
